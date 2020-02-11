@@ -64,9 +64,10 @@ def token_2_id(sequence, vocab_list):
 
 ### final outputs are numpy formats
 def data_preprocesing(train_file, dev_file, embed_file, max_len):
-    train_pair, train_label_set = read_raw_sentence(train_file)
-    dev_pair, dev_label_set = read_raw_sentence(dev_file)
-    label_set = list(set(train_label_set + dev_label_set))
+    train_pair, label_set = read_raw_sentence(train_file)
+    # dev_pair, dev_label_set = read_raw_sentence(dev_file)
+    # label_set = list(set(train_label_set + dev_label_set))
+    dev_pair, _ = read_raw_sentence(dev_file)
     embed, vocab_list = load_embeddings(embed_file)
 
     # training data token to index
@@ -121,6 +122,9 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
 train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted-sample/train.txt',
                                     '../data/BIO-formatted-sample/dev.txt',
                                     '/home/hlr/shared/glove6B/glove.6B.50d.txt',20)
+# train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted/conll2012.train.txt',
+#                                     '../data/BIO-formatted/conll2012.devel.txt',
+#                                     '/home/hlr/shared/glove6B/glove.6B.50d.txt',20)
 print('first train sample data:', train[0][0])
 print('first train sample mask:', train[1][0])
 print('first train sample label:', train[2][0])
