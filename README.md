@@ -49,7 +49,7 @@ After data reader, the data is like this format:
   991    5  552 3041   18 6399]
 2. first dev sample mask: [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
 3. first dev sample label: [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 10, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-4. first dev sample predicate position: 4
+4. first dev sample predicate position: 10
 ----------------------------------------------------
 
 
