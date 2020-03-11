@@ -76,11 +76,12 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     dev_samples = [sequence_to_id(sent[0], token_vocab) for sent in dev_pair]
     dev_mask = [len(sent[0]) for sent in dev_pair]
     dev_labels = [sequence_to_id(sent[1], label_vocab) for sent in dev_pair]
-    dev_predicate = [sent[2] for sent in train_pair]
+    dev_predicate = [sent[2] for sent in dev_pair]
 
     ### mask the training sample length
     for i in range(len(train_samples)):
         if len(train_samples[i]) < max_len:
+            # train_samples[i] = train_samples[i] + [0]*(max_len - len(train_samples[i]))
             train_samples[i] = train_samples[i] + [0]*(max_len - len(train_samples[i]))
             train_mask[i] = [1]*train_mask[i] + [0]*(max_len - train_mask[i])
             train_labels[i] = train_labels[i] + ['O']*(max_len - len(train_samples[i]))
@@ -92,6 +93,7 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     ### mask the dev sample length
     for i in range(len(dev_samples)):
         if len(dev_samples[i]) < max_len:
+            # dev_samples[i] = dev_samples[i] + [0]*(max_len - len(dev_samples[i]))
             dev_samples[i] = dev_samples[i] + [0]*(max_len - len(dev_samples[i]))
             dev_mask[i] = [1]*dev_mask[i] + [0]*(max_len - dev_mask[i])
             dev_labels[i] = dev_labels[i] + ['O']*(max_len - len(dev_samples[i]))
@@ -117,14 +119,15 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
             (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np), emb_np, token_vocab, label_vocab
 
 ### test data_preprocesing
-#train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted-sample/train.txt',
-#                                    '../data/BIO-formatted-sample/dev.txt',
-#                                    '../data/glove.6B.50d.txt',20)
+#### sample data
+# train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted-sample/train.txt',
+#                                     '../data/BIO-formatted-sample/dev.txt',
+#                                     '/home/hlr/shared/data/glove6B/glove.6B.50d.txt',20)
 
-if __name__ == "__main__":
-    train, dev, emb, tok_vocab, label_vocab = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
-                                        'data/BIO-formatted/conll2012.devel.txt',
-                                        '/home/hlr/shared/data/glove6B/glove.6B.50d.txt',20)
+#### full data
+# train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted/conll2012.train.txt',
+#                                     '../data/BIO-formatted/conll2012.devel.txt',
+#                                     '/home/hlr/shared/data/glove6B/glove.6B.50d.txt',20)
 # print('first train sample data:', train[0][0])
 # print('first train sample mask:', train[1][0])
 # print('first train sample label:', train[2][0])
@@ -135,7 +138,7 @@ if __name__ == "__main__":
 # print('first dev sample label:', dev[2][0])
 # print('first dev sample predicate position:', dev[3][0])
 # print('----------------------------------------------------')
-#print('embeding shape:', emb.shape)
+# print('embeding shape:', emb.shape)
 # print('vocab list length:', len(vocab))
 # print('label_list:', labels)
 
