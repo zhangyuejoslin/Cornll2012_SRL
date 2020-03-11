@@ -121,23 +121,24 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
 ### test data_preprocesing
 train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted-sample/train.txt',
                                     '../data/BIO-formatted-sample/dev.txt',
-                                    '/home/hlr/shared/glove6B/glove.6B.50d.txt',20)
+                                    '../data/glove.6B.50d.txt',20)
 # train, dev, emb, vocab, labels = data_preprocesing('../data/BIO-formatted/conll2012.train.txt',
 #                                     '../data/BIO-formatted/conll2012.devel.txt',
 #                                     '/home/hlr/shared/glove6B/glove.6B.50d.txt',20)
-print('first train sample data:', train[0][0])
-print('first train sample mask:', train[1][0])
-print('first train sample label:', train[2][0])
-print('first train sample predicate position:', train[3][0])
-print('----------------------------------------------------')
-print('first dev sample data:', dev[0][0])
-print('first dev sample mask:', dev[1][0])
-print('first dev sample label:', dev[2][0])
-print('first dev sample predicate position:', dev[3][0])
-print('----------------------------------------------------')
-print('embeding shape:', emb.shape)
-print('vocab list length:', len(vocab))
-print('label_list:', labels)
+# print('first train sample data:', train[0][0])
+# print('first train sample mask:', train[1][0])
+# print('first train sample label:', train[2][0])
+# print('first train sample predicate position:', train[3][0])
+# print('----------------------------------------------------')
+# print('first dev sample data:', dev[0][0])
+# print('first dev sample mask:', dev[1][0])
+# print('first dev sample label:', dev[2][0])
+# print('first dev sample predicate position:', dev[3][0])
+# print('----------------------------------------------------')
+#print('embeding shape:', emb.shape)
+# print('vocab list length:', len(vocab))
+# print('label_list:', labels)
+
 
     
 
