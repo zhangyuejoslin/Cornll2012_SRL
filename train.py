@@ -1,6 +1,7 @@
 from sklearn import metrics
 from statistics import mean
 import torch
+import random
 from tqdm import tqdm
 from data_helper.data_reader import data_preprocesing
 from model.LSTM_baseline import LSTM_Model
@@ -22,16 +23,54 @@ def train(model, opt, new_train_sample, vocab_label):
         #label_vec: length * batch * label_length
         label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
 
-        label_vec = torch.zeros(len(token), 1, len(labels)).cuda()
-        for each_label in label_list:
-            label_vec[sid, 0, each_label] = 1
+        for batch_num in range(token.shape[1]):
+            for each_label in range(len(label_list[batch_num])):
+                label_num = label_list[batch_num][each_label]
+                label_vec[each_label, batch_num, label_num] = 1
 
         loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda()
         loss.backward()
         opt.step()
         ls.append(loss.item())
-        sid += 1
     return ls
+
+def eval(model, samples, masks, labels, label_vocab):
+    """
+    model: A pytorch module
+    samples: dataset samples (n * max_len)
+    masks: dataset mask (n * max_len)
+    labels: dataset labels (n * max_len)
+    label_vocab: a torchtext vocab for labels
+    """
+    all_preds = torch.tensor([],dtype=torch.long).cuda()
+    all_labels = torch.tensor([],dtype=torch.long).cuda()
+    with torch.no_grad():
+        for i in tqdm(range(samples.shape[1]), total=(82510/50), desc="Validation"):
+            # tokens: 1 * length of sentence
+            # label_list: 1 * length
+            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0)
+            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0)
+
+            tokens = torch.tensor(tokens, dtype=torch.long).cuda()
+
+            # tokens: len * 1
+            tokens = torch.t(tokens)
+            #logit: length * 1 * labels
+            logit: torch.Tensor = model(tokens)
+
+            # argmax predictions
+            # predictions: length * 1
+            _, predictions = logit.max(dim=2)
+
+            # predictions: length
+            predictions.squeeze_()
+            # label_list: length
+            label_list = torch.tensor(label_list, dtype=torch.long).squeeze().cuda()
+
+            all_preds = torch.cat((all_preds, predictions))
+            all_labels = torch.cat((all_labels, label_list))
+    
+    return metrics.f1_score(y_true=all_labels.cpu(), y_pred=all_preds.cpu(), average='micro')
 
             
 
@@ -72,10 +111,12 @@ if __name__ == '__main__':
     for epoch in range(50):
         print(f'Starting epoch {epoch+1}') 
         new_train_sample =  generate_batch(train_samples_np, train_labels_np, 50, False)
-        ls = train(model, opt, new_train_sample,labels.stoi)
-        new_train_sample = zip(train_samples_np, train_labels_np)
-        ls = train(model, opt, new_train_sample)
-        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
+        ls = train(model, opt, new_train_sample,labels)
+
+        # Validation
+        f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels)
+
+        print(f'Epoch {epoch+1} finished, validation F1: {f1_score}')
     torch.save({'model': model.state_dict()}, save_file_path)
 
  
