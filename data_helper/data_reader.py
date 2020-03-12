@@ -7,9 +7,9 @@ sample example:
 5 We respectfully invite you to watch a special edition of Across China . ||| O O O B-ARG0 O B-V B-ARG1 I-ARG1 I-ARG1 I-ARG1 I-ARG1 I-ARG1 O
 where 5 is the index of predicate in this sample.
 '''
-def read_raw_sentences(file_path):
+def read_raw_sentences(file_path, counter=None):
     word_label_pair_sentences = []
-    label_counter = Counter()
+    label_counter = counter if counter is not None else Counter()
     f = open(file_path, 'r')
     for line in f:
         line = line.strip().split('|||')
@@ -23,7 +23,7 @@ def read_raw_sentences(file_path):
         predicate = int(words[0])
         word_label_pair_sentences.append([words[1:], labels, predicate]) ## x, y, index of predicate
     f.close()
-    return word_label_pair_sentences, Vocab(label_counter)
+    return word_label_pair_sentences, label_counter
 
 # ## test case for read_raw_sentences: pass
 # res, label_dict= read_raw_sentences('../data/BIO-formatted-sample/train.txt')
@@ -55,15 +55,16 @@ def sequence_to_id(sequence, vocab):
 ### final outputs are numpy formats
 def data_preprocesing(train_file, dev_file, embed_file, max_len):
     print('Reading training data...')
-    train_pair, label_vocab = read_raw_sentences(train_file)
+    train_pair, label_counter = read_raw_sentences(train_file)
     print(f'Loaded {len(train_pair)} examples from {train_file}')
     # dev_pair, dev_label_set = read_raw_sentences(dev_file)
     # label_set = list(set(train_label_set + dev_label_set))
     print('Reading dev data...')
-    dev_pair, _ = read_raw_sentences(dev_file)
+    dev_pair, _ = read_raw_sentences(dev_file, counter=label_counter)
     print(f'Loaded {len(dev_pair)} examples from {dev_file}')
     print('Loading glove vectors...')
     embed, token_vocab = load_embeddings(embed_file)
+    label_vocab = Vocab(label_counter)
 
     print('Preprocessing data...')
     # training data token to index

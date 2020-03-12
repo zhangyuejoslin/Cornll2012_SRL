@@ -45,7 +45,7 @@ def eval(model, samples, masks, labels, label_vocab):
     all_preds = torch.tensor([],dtype=torch.long).cuda()
     all_labels = torch.tensor([],dtype=torch.long).cuda()
     with torch.no_grad():
-        for i in tqdm(range(samples.shape[1]), total=(82510/50), desc="Validation"):
+        for i in tqdm(range(samples.shape[1]), total=(35297), desc="Validation"):
             # tokens: 1 * length of sentence
             # label_list: 1 * length
             tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0)
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                                                                            'data/BIO-formatted/conll2012.devel.txt',
                                                                            'data/glove.6B.50d.txt', 20)
     save_file_path = 'model-lstm.th'
-    model = LSTM_Model(emb, labels.stoi).cuda()
+    model = LSTM_Model(emb, labels).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
