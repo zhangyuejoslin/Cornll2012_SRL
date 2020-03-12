@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 from data_helper.data_reader import data_preprocesing
 from model.LSTM_baseline import LSTM_Model
-
+import random
 
 def train(model, opt, new_train_sample, vocab_label):
     ls = []
@@ -22,18 +22,16 @@ def train(model, opt, new_train_sample, vocab_label):
         #label_vec: length * batch * label_length
         label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
 
-        label_vec = torch.zeros(len(token), 1, len(labels)).cuda()
-        for each_label in label_list:
-            label_vec[sid, 0, each_label] = 1
+        for batch_num in range(token.shape[1]):
+            for each_label in range(len(label_list[batch_num])):
+                label_num = label_list[batch_num][each_label]
+                label_vec[each_label, batch_num, label_num] = 1
 
         loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda()
         loss.backward()
         opt.step()
         ls.append(loss.item())
-        sid += 1
     return ls
-
-            
 
 def find_list(indices, data):
     out = []
@@ -65,7 +63,7 @@ if __name__ == '__main__':
                                                                            'data/BIO-formatted/conll2012.devel.txt',
                                                                            'data/glove.6B.50d.txt', 20)
     save_file_path = 'model-lstm.th'
-    model = LSTM_Model(emb, labels).cuda()
+    model = LSTM_Model(emb, labels.stoi).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
@@ -73,9 +71,6 @@ if __name__ == '__main__':
         print(f'Starting epoch {epoch+1}') 
         new_train_sample =  generate_batch(train_samples_np, train_labels_np, 50, False)
         ls = train(model, opt, new_train_sample,labels.stoi)
-        new_train_sample = zip(train_samples_np, train_labels_np)
-        ls = train(model, opt, new_train_sample)
         print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
     torch.save({'model': model.state_dict()}, save_file_path)
 
- 

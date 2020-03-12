@@ -14,7 +14,8 @@ class LSTM_Model(torch.nn.Module):
         self.linear = torch.nn.Linear(200, len(labels))
 
     def forward(self,sentence):
-        emb = self.embedding(sentence).unsqueeze(1)
+         # emb: length * batch * dim
+        emb = self.embedding(sentence)
         rnn_embedding, _ = self.rnn(emb)
         logits = self.linear(rnn_embedding)
         return logits
