@@ -51,24 +51,23 @@ def load_embeddings(file_path):
 
 def sequence_to_id(sequence, vocab):
     return [vocab.stoi[elem] for elem in sequence]
-    
-# def label_2_id(sequence, label_dict):
-#     ids = []
-#     for word in sequence:
-#         ids.append(label_dict[word])
-#     return ids
 
 ### final outputs are numpy formats
 def data_preprocesing(train_file, dev_file, embed_file, max_len):
+    print('Reading training data...')
     train_pair, label_vocab = read_raw_sentences(train_file)
+    print(f'Loaded {len(train_pair)} examples from {train_file}')
     # dev_pair, dev_label_set = read_raw_sentences(dev_file)
     # label_set = list(set(train_label_set + dev_label_set))
+    print('Reading dev data...')
     dev_pair, _ = read_raw_sentences(dev_file)
+    print(f'Loaded {len(dev_pair)} examples from {dev_file}')
+    print('Loading glove vectors...')
     embed, token_vocab = load_embeddings(embed_file)
 
+    print('Preprocessing data...')
     # training data token to index
     train_samples = [sequence_to_id(sent[0], token_vocab) for sent in train_pair]
-    train_mask = [len(sent[0]) for sent in train_pair]
     train_labels = [sequence_to_id(sent[1], label_vocab) for sent in train_pair]
     train_predicate = [sent[2] for sent in train_pair]
 
@@ -78,29 +77,28 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     dev_labels = [sequence_to_id(sent[1], label_vocab) for sent in dev_pair]
     dev_predicate = [sent[2] for sent in dev_pair]
 
-    ### mask the training sample length
-    for i in range(len(train_samples)):
-        if len(train_samples[i]) < max_len:
-            # train_samples[i] = train_samples[i] + [0]*(max_len - len(train_samples[i]))
-            train_samples[i] = train_samples[i] + [0]*(max_len - len(train_samples[i]))
-            train_mask[i] = [1]*train_mask[i] + [0]*(max_len - train_mask[i])
-            train_labels[i] = train_labels[i] + ['O']*(max_len - len(train_samples[i]))
-        else:
-            train_samples[i] = train_samples[i][0:max_len]
-            train_mask[i] = [1]*max_len
-            train_labels[i] = train_labels[i]
+    def mask_samples(samples, labels):
+        """
+        Takes a list of samples and pads/truncates them to max_len, returning the mask as well
+        samples: n x seq_len (list)
+        labels: n x seq_len (list)
+        """
+        mask = [len(sent) for sent in samples]
+        ### mask the training sample length
+        for i in range(len(samples)):
+            if len(samples[i]) < max_len:
+                # samples[i] = samples[i] + [0]*(max_len - len(samples[i]))
+                samples[i] = samples[i] + [token_vocab.stoi['<pad>']]*(max_len - len(samples[i]))
+                mask[i] = [1]*mask[i] + [0]*(max_len - mask[i])
+                labels[i] = labels[i] + [label_vocab.stoi['O']]*(max_len - len(labels[i]))
+            else:
+                samples[i] = samples[i][0:max_len]
+                mask[i] = [1]*max_len
+                labels[i] = labels[i][0:max_len]
+        return samples, mask, labels
 
-    ### mask the dev sample length
-    for i in range(len(dev_samples)):
-        if len(dev_samples[i]) < max_len:
-            # dev_samples[i] = dev_samples[i] + [0]*(max_len - len(dev_samples[i]))
-            dev_samples[i] = dev_samples[i] + [0]*(max_len - len(dev_samples[i]))
-            dev_mask[i] = [1]*dev_mask[i] + [0]*(max_len - dev_mask[i])
-            dev_labels[i] = dev_labels[i] + ['O']*(max_len - len(dev_samples[i]))
-        else:
-            dev_samples[i] = dev_samples[i][0:max_len]
-            dev_mask[i] = [1]*max_len
-            dev_labels[i] = dev_labels[i]
+    train_samples, train_mask, train_labels = mask_samples(train_samples, train_labels)
+    dev_samples, dev_mask, dev_labels = mask_samples(dev_samples, dev_labels)
     
     ### transfer list to numpy
     train_samples_np = np.array(train_samples)
@@ -112,8 +110,21 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     dev_labels_np = np.array(dev_labels)
     dev_predicate_np = np.array(dev_predicate)
     emb_np = np.array(embed)
+    print('Done preprocessing')
 
-    # Convert dicts back into lists for compatibility
+    print('Sample Data')
+    print(f'Sample')
+    print(f'\tshape: {train_samples_np.shape}')
+    print(f'\tex: {train_samples_np[0]}')
+    print('\t'+' '.join([token_vocab.itos[i] for i in train_samples_np[0]]))
+    print(f'Label')
+    print(f'\tshape: {train_labels_np.shape}')
+    print(f'\tex: {train_labels_np[0]}')
+    print('\t'+' '.join([label_vocab.itos[i] for i in train_labels_np[0]]))
+    print('Predicate')
+    print(f'\tshape: {train_predicate_np.shape}')
+    print(f'\tex: {train_predicate_np[0]}')
+
   
     return (train_samples_np, train_mask_np, train_labels_np, train_predicate_np),\
             (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np), emb_np, token_vocab, label_vocab
