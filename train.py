@@ -1,17 +1,26 @@
+from sklearn import metrics
+from statistics import mean
 import torch
 from tqdm import tqdm
 from data_helper.data_reader import data_preprocesing
 from model.LSTM_baseline import LSTM_Model
 
 
-def train(model, opt, new_train_sample):
+def train(model, opt, new_train_sample, vocab_label):
     ls = []
-    for example in tqdm(new_train_sample):
-        sid = 0
+    for example in tqdm(new_train_sample, total=(82510/50), desc="Training"):
+        # token: batch * length of sentence
+        # label_list: batch * length
         token, label_list = example
+        # token: length * batch
+        token = zip(*token)
 
         opt.zero_grad()
-        logit = model(torch.tensor(token).cuda())
+        token = torch.tensor(tuple(token)).cuda()
+        #logit: length * batch * dim
+        logit = model(token)
+        #label_vec: length * batch * label_length
+        label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
 
         label_vec = torch.zeros(len(token), 1, len(labels)).cuda()
         for each_label in label_list:
@@ -24,6 +33,32 @@ def train(model, opt, new_train_sample):
         sid += 1
     return ls
 
+            
+
+def find_list(indices, data):
+    out = []
+    for i in indices:
+        out = out +[data[i][:20]]
+    return out
+
+def generate_batch(vocab_list, label_list, batch_size, shuffle=False):
+    rows = len(vocab_list)
+    indices = list(range(rows))
+    number = 1
+    if shuffle:
+        random.seed(100)
+        random.shuffle(indices)
+    while True:
+        batch_indices = indices[0:batch_size]
+        indices = indices[batch_size:] + indices[:batch_size]
+        temp_data_vocab = find_list(batch_indices, vocab_list)
+        temp_data_label = find_list(batch_indices, label_list)
+        batch_data = (temp_data_vocab, temp_data_label)
+        yield batch_data
+        if batch_size * number >= rows:
+            break
+        number += 1
+
 if __name__ == '__main__':
 
     train_set, dev_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
@@ -32,8 +67,15 @@ if __name__ == '__main__':
     save_file_path = 'model-lstm.th'
     model = LSTM_Model(emb, labels).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
+    dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(50):
+        print(f'Starting epoch {epoch+1}') 
+        new_train_sample =  generate_batch(train_samples_np, train_labels_np, 50, False)
+        ls = train(model, opt, new_train_sample,labels.stoi)
         new_train_sample = zip(train_samples_np, train_labels_np)
         ls = train(model, opt, new_train_sample)
+        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
     torch.save({'model': model.state_dict()}, save_file_path)
+
+ 
