@@ -5,7 +5,7 @@ import random
 from tqdm import tqdm
 from data_helper.data_reader import data_preprocesing
 from model.LSTM_baseline import LSTM_Model
-
+import random
 
 def train(model, opt, new_train_sample, vocab_label):
     ls = []
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                                                                            'data/BIO-formatted/conll2012.devel.txt',
                                                                            'data/glove.6B.50d.txt', 20)
     save_file_path = 'model-lstm.th'
-    model = LSTM_Model(emb, labels).cuda()
+    model = LSTM_Model(emb, labels.stoi).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
@@ -119,4 +119,3 @@ if __name__ == '__main__':
         print(f'Epoch {epoch+1} finished, validation F1: {f1_score}')
     torch.save({'model': model.state_dict()}, save_file_path)
 
- 
