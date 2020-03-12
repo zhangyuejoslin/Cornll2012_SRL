@@ -1,25 +1,26 @@
+from sklearn import metrics
+from statistics import mean
 import torch
 from tqdm import tqdm
 from data_helper.data_reader import data_preprocesing
 from model.LSTM_baseline import LSTM_Model
 import random
 
-
-def train(model, opt, new_train_sample, voacb_label):
+def train(model, opt, new_train_sample, vocab_label):
     ls = []
-    for example in tqdm(new_train_sample):
+    for example in tqdm(new_train_sample, total=(82510/50), desc="Training"):
         # token: batch * length of sentence
         # label_list: batch * length
         token, label_list = example
-         # token: length * batch
+        # token: length * batch
         token = zip(*token)
 
         opt.zero_grad()
-        #logit: length * batch * dim
         token = torch.tensor(tuple(token)).cuda()
+        #logit: length * batch * dim
         logit = model(token)
         #label_vec: length * batch * label_length
-        label_vec = torch.zeros(token.shape[0], token.shape[1], len(voacb_label)).cuda()
+        label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
 
         for batch_num in range(token.shape[1]):
             for each_label in range(len(label_list[batch_num])):
@@ -55,8 +56,6 @@ def generate_batch(vocab_list, label_list, batch_size, shuffle=False):
         if batch_size * number >= rows:
             break
         number += 1
-       
-
 
 if __name__ == '__main__':
 
@@ -66,10 +65,12 @@ if __name__ == '__main__':
     save_file_path = 'model-lstm.th'
     model = LSTM_Model(emb, labels.stoi).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
+    dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(50):
+        print(f'Starting epoch {epoch+1}') 
         new_train_sample =  generate_batch(train_samples_np, train_labels_np, 50, False)
         ls = train(model, opt, new_train_sample,labels.stoi)
+        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
     torch.save({'model': model.state_dict()}, save_file_path)
 
- 
