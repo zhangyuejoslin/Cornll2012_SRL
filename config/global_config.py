@@ -18,7 +18,7 @@ class CONFIG(object):
         self.learning_rate = 0.1   # Initial learning rate.
         self.epochs  = 200  # Number of epochs to train.
         self.num_lstm_layers = 3 # number of layers for lstm
-        self.lstm_hidden_dim = 100 # lstm hidden dimension
+        self.lstm_hidden_dim = 200 # lstm hidden dimension
         self.hidden1 = 200  # Number of units in hidden layer 1.
         self.dropout = 0.5  # Dropout rate (1 - keep probability).
         self.weight_decay = 0.   # Weight for L2 loss on embedding matrix.
@@ -26,6 +26,8 @@ class CONFIG(object):
         self.batch_size = 1000
         self.gpu_node = 1 # which gpu you want to use;
         self.max_len = 30
+        self.model_store_dir = 'checkpoint'
+        self.model_store_file = '1.pt'
 
 
 
