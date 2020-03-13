@@ -53,14 +53,16 @@ def sequence_to_id(sequence, vocab):
     return [vocab.stoi[elem] for elem in sequence]
 
 ### final outputs are numpy formats
-def data_preprocesing(train_file, dev_file, embed_file, max_len):
+def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
     print('Reading training data...')
     train_pair, label_counter = read_raw_sentences(train_file)
     print(f'Loaded {len(train_pair)} examples from {train_file}')
     # dev_pair, dev_label_set = read_raw_sentences(dev_file)
     # label_set = list(set(train_label_set + dev_label_set))
     print('Reading dev data...')
-    dev_pair, _ = read_raw_sentences(dev_file, counter=label_counter)
+    dev_pair, label_counter = read_raw_sentences(dev_file, counter=label_counter)
+
+    test_pair, label_counter = read_raw_sentences(test_file, counter=label_counter)
     print(f'Loaded {len(dev_pair)} examples from {dev_file}')
     print('Loading glove vectors...')
     embed, token_vocab = load_embeddings(embed_file)
@@ -72,11 +74,17 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     train_labels = [sequence_to_id(sent[1], label_vocab) for sent in train_pair]
     train_predicate = [sent[2] for sent in train_pair]
 
-    # training data token to index
+    # dev data token to index
     dev_samples = [sequence_to_id(sent[0], token_vocab) for sent in dev_pair]
     dev_mask = [len(sent[0]) for sent in dev_pair]
     dev_labels = [sequence_to_id(sent[1], label_vocab) for sent in dev_pair]
     dev_predicate = [sent[2] for sent in dev_pair]
+
+    # test data tok-> inx
+    test_samples = [sequence_to_id(sent[0], token_vocab) for sent in test_pair]
+    test_mask = [len(sent[0]) for sent in test_pair]
+    test_labels = [sequence_to_id(sent[1], label_vocab) for sent in test_pair]
+    test_predicate = [sent[2] for sent in test_pair]
 
     def mask_samples(samples, labels):
         """
@@ -100,6 +108,7 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
 
     train_samples, train_mask, train_labels = mask_samples(train_samples, train_labels)
     dev_samples, dev_mask, dev_labels = mask_samples(dev_samples, dev_labels)
+    test_samples, test_mask, test_labels = mask_samples(test_samples, test_labels)
     
     ### transfer list to numpy
     train_samples_np = np.array(train_samples)
@@ -110,6 +119,10 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
     dev_mask_np = np.array(dev_mask)
     dev_labels_np = np.array(dev_labels)
     dev_predicate_np = np.array(dev_predicate)
+    test_samples_np = np.array(test_samples)
+    test_mask_np = np.array(test_mask)
+    test_labels_np = np.array(test_labels)
+    test_predicate_np = np.array(test_predicate)
     emb_np = np.array(embed)
     print('Done preprocessing')
 
@@ -128,7 +141,8 @@ def data_preprocesing(train_file, dev_file, embed_file, max_len):
 
   
     return (train_samples_np, train_mask_np, train_labels_np, train_predicate_np),\
-            (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np), emb_np, token_vocab, label_vocab
+            (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np),\
+            (test_samples_np, test_mask_np, test_labels_np, test_predicate_np), emb_np, token_vocab, label_vocab
 
 ### test data_preprocesing
 #### sample data
