@@ -1,6 +1,6 @@
-global_config = {
-    'max_len':30,
-}
+# global_config = {
+#     'max_len':30,
+# }
 
 
 
@@ -24,10 +24,10 @@ class CONFIG(object):
         self.early_stopping = 20 # Tolerance for early stopping (# of epochs).
         self.batch_size = 512
         self.gpu_node = 1 # which gpu you want to use;
-        self.max_len = 30
+        self.max_len = 20
         self.beam_search_top_k = 5
         self.model_store_dir = 'checkpoint'
-        self.model_store_file = '1.pt'
+        self.model_store_file = '3.pt'
 
 
 
