@@ -101,7 +101,7 @@ if __name__ == '__main__':
     train_set, dev_set, test_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
                                                                            'data/BIO-formatted/conll2012.devel.txt',
                                                                            'data/BIO-formatted/conll2012.test.txt',
-                                                                           'data/glove.6B.50d.txt', 20)
+                                                                           '/home/hlr/shared/data/glove6B/glove.6B.50d.txt', 20)
     save_file_path = 'model-lstm.th'
     model = LSTM_Model(emb, labels).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set

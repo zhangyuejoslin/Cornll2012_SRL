@@ -119,9 +119,11 @@ def generate_batch(train_samples_np, train_mask_np, train_labels_np, batch_size,
 
 if __name__ == '__main__':
 
-    train_set, dev_set, emb, vocab, labels = data_preprocesing(cfg.train_loc,
+    train_set, dev_set, test_set, emb, vocab, labels = data_preprocesing(cfg.train_loc,
                                                                cfg.dev_loc,
-                                                               cfg.glove_embedding_loc, 20)
+                                                               cfg.test_loc,
+                                                               cfg.glove_embedding_loc, 
+                                                               cfg.max_len)
     num_train_set = train_set[0].shape[0]
     # num_dev_set = dev_set[0].shape[0]
 
@@ -131,6 +133,7 @@ if __name__ == '__main__':
     model = SRL_Model(emb, labels, is_test=False).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
+    test_samples_np, test_mask_np, test_labels_np, test_predicate_np = test_set
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(cfg.epochs):
         print(f'Starting epoch {epoch+1}') 
@@ -141,5 +144,9 @@ if __name__ == '__main__':
         f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels)
 
         print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
-    torch.save({'model': model.state_dict()}, cfg.model_store_file)
+    torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+
+    ### test
+    f1_score = eval(model, test_samples_np, test_mask_np, test_labels_np, labels)
+    print(f'Test F1: {f1_score}')
 
