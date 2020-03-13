@@ -23,12 +23,10 @@ class SRL_Model(torch.nn.Module):
         ### word embedding
         vocab_len = len(pretrain_emb)
         word_embeddings_dim = len(pretrain_emb[0])
-        self.embeddings = nn.Embedding(vocab_len, word_embeddings_dim, padding_idx=0)
-        if is_test is False:
-            self.embeddings.weight.data.copy_(torch.from_numpy(np.array(pretrain_emb)))
-            self.embeddings.weight.requires_grad = True
-        else:
-            self.embeddings.weight.requires_grad = False
+        # self.embeddings = nn.Embedding(vocab_len, word_embeddings_dim, padding_idx=0)
+        self.embeddings = nn.Embedding(vocab_len, word_embeddings_dim)
+        self.embeddings.weight.data.copy_(torch.from_numpy(np.array(pretrain_emb)))
+        self.embeddings.weight.requires_grad = True
 
         ## lstm
         self.lstm = nn.LSTM(word_embeddings_dim, cfg.lstm_hidden_dim, num_layers=cfg.num_lstm_layers, bidirectional=True, batch_first=False)
@@ -41,15 +39,16 @@ class SRL_Model(torch.nn.Module):
     
     def forward(self, sentence, sen_mask):
         x = self.embeddings(sentence)
+        sen_mask = sen_mask.transpose(0, 1)
         hidden_state, _ = self.lstm(x)
-        hidden_state = hidden_state.transpose(1, 0)
         hidden_state = sen_mask.unsqueeze(2) * hidden_state
-        hidden_state_highway_out = self.highway_gates(hidden_state)
-        hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
-        logits = self.hidden2tag(hidden_state_highway_out)
+        # hidden_state_highway_out = self.highway_gates(hidden_state)
+        # hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
+        # logits = self.hidden2tag(hidden_state_highway_out)
+        logits = self.hidden2tag(hidden_state)
         return logits
 
-    def get_span_candidates(text_len, max_sentence_length, max_mention_width):
+    def get_span_candidates(self, text_len, max_sentence_length, max_mention_width):
         """Get a list of candidate spans up to length W.
         Args:
             text_len: Tensor of [num_sentences,]

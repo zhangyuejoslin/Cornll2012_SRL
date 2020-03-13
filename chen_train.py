@@ -11,9 +11,9 @@ import random
 #### load config
 cfg = CONFIG()
 
-def train(model, opt, new_train_sample, voacb_label):
+def train(model, opt, new_train_sample, vocab_label, total_num_trian_sample):
     ls = []
-    for example in tqdm(new_train_sample):
+    for example in tqdm(new_train_sample, total=(total_num_trian_sample//cfg.batch_size), desc="Training"):
         # token: batch * length of sentence
         # label_list: batch * length
         token, mask, label_list = example
@@ -26,13 +26,13 @@ def train(model, opt, new_train_sample, voacb_label):
         mask = torch.tensor(tuple(mask)).cuda()
         logit = model(token, mask)
         #label_vec: length * batch * label_length
-        label_vec = torch.zeros(token.shape[1], token.shape[0], len(voacb_label)).cuda()
+        label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
 
         for batch_num in range(token.shape[1]):
             for each_label in range(len(label_list[batch_num])):
                 label_num = label_list[batch_num][each_label]
-                # label_vec[each_label, batch_num, label_num] = 1
-                label_vec[batch_num, each_label, label_num] = 1
+                label_vec[each_label, batch_num, label_num] = 1
+                # label_vec[batch_num, each_label, label_num] = 1
                 
 
         loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda()
@@ -40,6 +40,57 @@ def train(model, opt, new_train_sample, voacb_label):
         opt.step()
         ls.append(loss.item())
     return ls
+
+def eval(model, samples, masks, labels, label_vocab):
+    """
+    model: A pytorch module
+    samples: dataset samples (n * max_len)
+    masks: dataset mask (n * max_len)
+    labels: dataset labels (n * max_len)
+    label_vocab: a torchtext vocab for labels
+    """
+    all_preds = torch.tensor([],dtype=torch.long).cuda()
+    all_labels = torch.tensor([],dtype=torch.long).cuda()
+    with torch.no_grad():
+        for i in tqdm(range(0, samples.shape[0], cfg.batch_size), total=(samples.shape[0]//cfg.batch_size), desc="Validation"):
+        # for i in range(samples.shape[0]):
+            # tokens: 1 * length of sentence
+            # label_list: 1 * length
+
+            tokens = torch.tensor(samples[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0)
+            label_list = torch.tensor(labels[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0)
+            cur_masks = torch.tensor(masks[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0)
+
+            tokens = torch.tensor(tokens, dtype=torch.long).cuda()
+            cur_masks = torch.tensor(cur_masks, dtype=torch.long).cuda()
+            # tokens: len * 1
+            tokens = torch.t(tokens)
+            #logit: length * 1 * labels
+            logit: torch.Tensor = model(tokens, cur_masks)
+
+            # argmax predictions
+            # predictions: length * 1
+            _, predictions = logit.max(dim=2)
+
+            # predictions: length
+            predictions.squeeze_()
+            # label_list: length
+            label_list = torch.tensor(label_list, dtype=torch.long).squeeze().cuda()
+
+            try: 
+                all_preds = torch.cat((all_preds, predictions))
+                all_labels = torch.cat((all_labels, label_list))
+            except:
+                # print(samples[i,:])
+                # print(labels[i,:])
+                # print(masks[i,:])
+                # print(samples[i,:][masks[i]==1])
+                # print(labels[i,:][masks[i]==1])
+                # print(masks[i,:][masks[i]==1])
+                pass
+    
+    return metrics.f1_score(y_true=all_labels.cpu(), y_pred=all_preds.cpu(), average='micro')
+
 
 def find_list(indices, data):
     out = []
@@ -68,20 +119,27 @@ def generate_batch(train_samples_np, train_mask_np, train_labels_np, batch_size,
 
 if __name__ == '__main__':
 
-    train_set, dev_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
-                                                                'data/BIO-formatted/conll2012.devel.txt',
-                                                                '/home/hlr/shared/data/glove6B/glove.6B.50d.txt', 20)
+    train_set, dev_set, emb, vocab, labels = data_preprocesing(cfg.train_loc,
+                                                               cfg.dev_loc,
+                                                               cfg.glove_embedding_loc, 20)
+    num_train_set = train_set[0].shape[0]
+    # num_dev_set = dev_set[0].shape[0]
+
     if not os.path.exists(cfg.model_store_dir):
         os.makedirs(cfg.model_store_dir)
-    model = SRL_Model(emb, labels.stoi, is_test=False).cuda()
+    # model = SRL_Model(emb, labels.stoi, is_test=False).cuda()
+    model = SRL_Model(emb, labels, is_test=False).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
+    dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     opt = torch.optim.Adam(model.parameters())
-    for epoch in range(50):
-        # new_train_sample =  generate_batch(train_samples_np, train_labels_np, 50, False)
-        # ls = train(model, opt, new_train_sample,labels.stoi)
+    for epoch in range(cfg.epochs):
         print(f'Starting epoch {epoch+1}') 
-        new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, 50, False)
-        ls = train(model, opt, new_train_sample,labels.stoi)
-        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
+        new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, cfg.batch_size, False)
+        # ls = train(model, opt, new_train_sample,labels.stoi, num_train_set)
+        ls = train(model, opt, new_train_sample, labels, num_train_set)
+        # Validation
+        f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels)
+
+        print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
     torch.save({'model': model.state_dict()}, cfg.model_store_file)
 
