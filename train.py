@@ -45,13 +45,11 @@ def eval(model, samples, masks, labels, label_vocab):
     all_preds = torch.tensor([],dtype=torch.long).cuda()
     all_labels = torch.tensor([],dtype=torch.long).cuda()
     with torch.no_grad():
-        for i in tqdm(range(samples.shape[1]), total=(35297), desc="Validation"):
+        for i in tqdm(range(samples.shape[0]), total=(35297), desc="Validation"):
             # tokens: 1 * length of sentence
             # label_list: 1 * length
-            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0)
-            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0)
-
-            tokens = torch.tensor(tokens, dtype=torch.long).cuda()
+            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
+            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
 
             # tokens: len * 1
             tokens = torch.t(tokens)
@@ -63,9 +61,9 @@ def eval(model, samples, masks, labels, label_vocab):
             _, predictions = logit.max(dim=2)
 
             # predictions: length
-            predictions.squeeze_()
+            predictions.squeeze_(-1)
             # label_list: length
-            label_list = torch.tensor(label_list, dtype=torch.long).squeeze().cuda()
+            label_list.squeeze_(0)
 
             all_preds = torch.cat((all_preds, predictions))
             all_labels = torch.cat((all_labels, label_list))
@@ -100,8 +98,9 @@ def generate_batch(vocab_list, label_list, batch_size, shuffle=False):
 
 if __name__ == '__main__':
 
-    train_set, dev_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
+    train_set, dev_set, test_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
                                                                            'data/BIO-formatted/conll2012.devel.txt',
+                                                                           'data/BIO-formatted/conll2012.test.txt',
                                                                            'data/glove.6B.50d.txt', 20)
     save_file_path = 'model-lstm.th'
     model = LSTM_Model(emb, labels).cuda()
