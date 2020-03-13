@@ -45,7 +45,7 @@ def eval(model, samples, masks, labels, label_vocab):
     all_preds = torch.tensor([],dtype=torch.long).cuda()
     all_labels = torch.tensor([],dtype=torch.long).cuda()
     with torch.no_grad():
-        for i in tqdm(range(samples.shape[0]), total=(35297), desc="Validation"):
+        for i in tqdm(range(samples.shape[0]), total=(len(samples)), desc="Validation"):
             # tokens: 1 * length of sentence
             # label_list: 1 * length
             tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
@@ -106,6 +106,7 @@ if __name__ == '__main__':
     model = LSTM_Model(emb, labels).cuda()
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
+    test_samples_np, test_mask_np, test_labels_np, test_predicate_np = test_set
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(50):
         print(f'Starting epoch {epoch+1}') 
@@ -113,8 +114,13 @@ if __name__ == '__main__':
         ls = train(model, opt, new_train_sample,labels)
 
         # Validation
-        f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels)
-
-        print(f'Epoch {epoch+1} finished, validation F1: {f1_score}')
+        f1_score_dev = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels)
+        print(f'Epoch {epoch+1} finished, validation F1: {f1_score_dev}')
     torch.save({'model': model.state_dict()}, save_file_path)
+
+    # load model to test
+    # checkpoint = torch.load(save_file_path)
+    # model.load_state_dict(checkpoint['model'])
+    # f1_score = eval(model, test_samples_np, test_mask_np,test_labels_np, labels)
+    # print(f1_score)
 
