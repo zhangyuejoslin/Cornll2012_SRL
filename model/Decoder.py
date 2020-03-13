@@ -72,12 +72,7 @@ def viterbi_decode(tag_sequence: torch.Tensor, transition_matrix: torch.Tensor, 
     return viterbi_paths, viterbi_scores
 
 
-###############################
-# Testing
-###############################
-
 from torch.autograd import Variable
-from tqdm import tqdm
 import random
 import numpy as np
 
@@ -94,4 +89,3 @@ def test_greedy():
 
 
 test_greedy()
-print('PASSED TEST GREEDY')
