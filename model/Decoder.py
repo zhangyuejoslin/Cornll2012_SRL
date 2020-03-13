@@ -1,4 +1,5 @@
 import torch
+import sys
 sys.path.append('../')
 from config.global_config import CONFIG
 
@@ -68,6 +69,7 @@ def viterbi_decode(tag_sequence: torch.Tensor, transition_matrix: torch.Tensor, 
         viterbi_path.reverse()
         # Viterbi paths uses (num_tags * n_permutations) nodes; therefore, we need to modulo.
         viterbi_path = [j % num_tags for j in viterbi_path]
+        viterbi_path[-1] = viterbi_path[-1].cpu().data.numpy().tolist()
         viterbi_paths.append(viterbi_path)
     return viterbi_paths, viterbi_scores
 
@@ -88,4 +90,4 @@ def test_greedy():
     print(indices, score)
 
 
-test_greedy()
+# test_greedy()

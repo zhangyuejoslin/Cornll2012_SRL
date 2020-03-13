@@ -27,7 +27,7 @@ class CONFIG(object):
         self.max_len = 20
         self.beam_search_top_k = 5
         self.model_store_dir = 'checkpoint'
-        self.model_store_file = '1.pt'
+        self.model_store_file = '3.pt'
 
 
 
