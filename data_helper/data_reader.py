@@ -1,6 +1,7 @@
 from collections import Counter
 import random
 import numpy as np
+import torch
 from torchtext.vocab import Vocab
 '''
 sample example:
@@ -85,6 +86,24 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
     test_mask = [len(sent[0]) for sent in test_pair]
     test_labels = [sequence_to_id(sent[1], label_vocab) for sent in test_pair]
     test_predicate = [sent[2] for sent in test_pair]
+
+    # Build binary bigram transition matrix
+
+    constraint_mat = torch.zeros((len(label_vocab), len(label_vocab)))
+
+    def update_constraint_mat(labels, matrix):
+        for label in labels:
+            last_label = None
+            for label_id in label:
+                if last_label is not None:
+                    matrix[last_label, label_id] = 1
+                last_label = label_id
+        return matrix
+
+    constraint_mat = update_constraint_mat(train_labels, constraint_mat)
+    constraint_mat = update_constraint_mat(dev_labels, constraint_mat)
+    constraint_mat = update_constraint_mat(test_labels, constraint_mat)
+
 
     def mask_samples(samples, labels):
         """
