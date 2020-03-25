@@ -23,11 +23,11 @@ def train(model, opt, new_train_sample, vocab_label, total_num_trian_sample):
 
         opt.zero_grad()
         #logit: length * batch * dim
-        token = torch.tensor(tuple(token)).cuda()
-        mask = torch.tensor(tuple(mask)).cuda()
+        token = torch.tensor(tuple(token)).cuda(cfg.use_which_gpu)
+        mask = torch.tensor(tuple(mask)).cuda(cfg.use_which_gpu)
         logit = model(token, mask)
         #label_vec: length * batch * label_length
-        label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda()
+        label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda(cfg.use_which_gpu)
 
         for batch_num in range(token.shape[1]):
             for each_label in range(len(label_list[batch_num])):
@@ -36,7 +36,7 @@ def train(model, opt, new_train_sample, vocab_label, total_num_trian_sample):
                 # label_vec[batch_num, each_label, label_num] = 1
                 
 
-        loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda()
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda(cfg.use_which_gpu)
         loss.backward()
         opt.step()
         ls.append(loss.item())
@@ -55,8 +55,8 @@ def eval(model, samples, masks, labels, label_vocab, transition_matrix):
     labels: dataset labels (n * max_len)
     label_vocab: a torchtext vocab for labels
     """
-    all_preds = torch.tensor([],dtype=torch.long).cuda()
-    all_labels = torch.tensor([],dtype=torch.long).cuda()
+    all_preds = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    all_labels = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
     with torch.no_grad():
         # for i in tqdm(range(0, samples.shape[0], cfg.batch_size), total=(samples.shape[0]//cfg.batch_size), desc="Validation"):
         for i in tqdm(range(samples.shape[0]), total=(len(samples)), desc="Validation"):
@@ -67,12 +67,12 @@ def eval(model, samples, masks, labels, label_vocab, transition_matrix):
             # tokens = torch.tensor(samples[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
             # label_list = torch.tensor(labels[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
             # cur_masks = torch.tensor(masks[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
-            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
-            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
-            cur_masks = torch.tensor(masks[i, :][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda()
+            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(masks[i, :][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
 
-            tokens = torch.tensor(tokens, dtype=torch.long).cuda()
-            cur_masks = torch.tensor(cur_masks, dtype=torch.long).cuda()
+            tokens = torch.tensor(tokens, dtype=torch.long).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(cur_masks, dtype=torch.long).cuda(cfg.use_which_gpu)
             # tokens: len * 1
             tokens = torch.t(tokens)
             #logit: length * 1 * labels
@@ -83,7 +83,7 @@ def eval(model, samples, masks, labels, label_vocab, transition_matrix):
             # _, predictions = logit.max(dim=2)
             # _, predictions_drew = logit.max(dim=2)
             predictions = call_viterbi(logit, transition_matrix)
-            predictions = torch.from_numpy(np.array(predictions)).cuda()
+            predictions = torch.from_numpy(np.array(predictions)).cuda(cfg.use_which_gpu)
             # print(predictions)
             # print(predictions_drew)
             # import sys
@@ -92,7 +92,7 @@ def eval(model, samples, masks, labels, label_vocab, transition_matrix):
             # predictions: length
             predictions.squeeze_()
             # label_list: length
-            label_list = torch.tensor(label_list, dtype=torch.long).squeeze().cuda()
+            label_list = torch.tensor(label_list, dtype=torch.long).squeeze().cuda(cfg.use_which_gpu)
             try:
                 all_preds = torch.cat((all_preds, predictions))
                 all_labels = torch.cat((all_labels, label_list))
@@ -130,19 +130,18 @@ def generate_batch(train_samples_np, train_mask_np, train_labels_np, batch_size,
 
 if __name__ == '__main__':
 
-    train_set, dev_set, test_set, emb, vocab, labels = data_preprocesing(cfg.train_loc,
+    train_set, dev_set, test_set, emb, vocab, labels, transition_matrix = data_preprocesing(cfg.train_loc,
                                                                cfg.dev_loc,
                                                                cfg.test_loc,
                                                                cfg.glove_embedding_loc, 
                                                                cfg.max_len)
     num_train_set = train_set[0].shape[0]
     # num_dev_set = dev_set[0].shape[0]
-    transition_matrix = torch.ones([len(labels), len(labels)]).cuda()  ## [num_labels, num_labels]
+    transition_matrix = transition_matrix.cuda(cfg.use_which_gpu)  ## [num_labels, num_labels]
 
     if not os.path.exists(cfg.model_store_dir):
         os.makedirs(cfg.model_store_dir)
-    # model = SRL_Model(emb, labels.stoi, is_test=False).cuda()
-    model = SRL_Model(emb, labels, is_test=False).cuda()
+    model = SRL_Model(emb, labels, is_test=False).train().cuda(cfg.use_which_gpu)
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
     test_samples_np, test_mask_np, test_labels_np, test_predicate_np = test_set
@@ -159,7 +158,7 @@ if __name__ == '__main__':
     torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
 
     ### test
-    f1_score_val = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
-    f1_score_test = eval(model, test_samples_np, test_mask_np, test_labels_np, labels, transition_matrix)
+    f1_score_val = eval(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
+    f1_score_test = eval(model.eval(), test_samples_np, test_mask_np, test_labels_np, labels, transition_matrix)
     print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
 

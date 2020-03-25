@@ -13,7 +13,7 @@ sys.path.append('../')
 from config.global_config import CONFIG
 
 
-import utils
+# import utils
 cfg = CONFIG()
 
 class SRL_Model(torch.nn.Module):
@@ -36,16 +36,21 @@ class SRL_Model(torch.nn.Module):
 
         # final layer
         self.hidden2tag = nn.Linear(cfg.lstm_hidden_dim*2, len(target_vocab))
+
+        #dropout
+        self.dropout = nn.Dropout(cfg.dropout) 
     
     def forward(self, sentence, sen_mask):
         x = self.embeddings(sentence)
         sen_mask = sen_mask.transpose(0, 1)
         hidden_state, _ = self.lstm(x)
         hidden_state = sen_mask.unsqueeze(2) * hidden_state
-        # hidden_state_highway_out = self.highway_gates(hidden_state)
-        # hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
-        # logits = self.hidden2tag(hidden_state_highway_out)
-        logits = self.hidden2tag(hidden_state)
+        hidden_state = self.dropout(hidden_state)
+        hidden_state_highway_out = self.highway_gates(hidden_state)
+        hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
+        hidden_state_highway_out = self.dropout(hidden_state_highway_out)
+        logits = self.hidden2tag(hidden_state_highway_out)
+        # logits = self.hidden2tag(hidden_state)
         return logits
 
     def get_span_candidates(self, text_len, max_sentence_length, max_mention_width):
