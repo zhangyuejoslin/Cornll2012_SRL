@@ -98,7 +98,7 @@ def generate_batch(vocab_list, label_list, batch_size, shuffle=False):
 
 if __name__ == '__main__':
 
-    train_set, dev_set, test_set, emb, vocab, labels = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
+    train_set, dev_set, test_set, emb, vocab, labels, transition_matrix = data_preprocesing('data/BIO-formatted/conll2012.train.txt',
                                                                            'data/BIO-formatted/conll2012.devel.txt',
                                                                            'data/BIO-formatted/conll2012.test.txt',
                                                                            '/home/hlr/shared/data/glove6B/glove.6B.50d.txt', 20)

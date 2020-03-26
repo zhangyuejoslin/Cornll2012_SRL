@@ -13,7 +13,7 @@ sys.path.append('../')
 from config.global_config import CONFIG
 
 
-import utils
+# import utils
 cfg = CONFIG()
 
 class SRL_Model(torch.nn.Module):
@@ -29,23 +29,31 @@ class SRL_Model(torch.nn.Module):
         self.embeddings.weight.requires_grad = True
 
         ## lstm
-        self.lstm = nn.LSTM(word_embeddings_dim, cfg.lstm_hidden_dim, num_layers=cfg.num_lstm_layers, bidirectional=True, batch_first=False)
+        self.lstm = nn.LSTM(word_embeddings_dim+1, cfg.lstm_hidden_dim, num_layers=cfg.num_lstm_layers, bidirectional=True, batch_first=False)
 
         ## lstm highway gate
         self.highway_gates = Highway(cfg.lstm_hidden_dim*2, 1, f=torch.nn.functional.relu)
 
         # final layer
         self.hidden2tag = nn.Linear(cfg.lstm_hidden_dim*2, len(target_vocab))
+
+        #dropout
+        self.dropout = nn.Dropout(cfg.dropout) 
     
-    def forward(self, sentence, sen_mask):
+    def forward(self, sentence, sen_mask, predicate_index):
         x = self.embeddings(sentence)
+        predicate_index = predicate_index.transpose(0, 1)
+        predicate_index = predicate_index.view(predicate_index.size()[0],predicate_index.size()[1], 1)
+        x = torch.cat((x,predicate_index), -1)
         sen_mask = sen_mask.transpose(0, 1)
         hidden_state, _ = self.lstm(x)
         hidden_state = sen_mask.unsqueeze(2) * hidden_state
-        # hidden_state_highway_out = self.highway_gates(hidden_state)
-        # hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
-        # logits = self.hidden2tag(hidden_state_highway_out)
-        logits = self.hidden2tag(hidden_state)
+        hidden_state = self.dropout(hidden_state)
+        hidden_state_highway_out = self.highway_gates(hidden_state)
+        hidden_state_highway_out = sen_mask.unsqueeze(2) * hidden_state_highway_out
+        hidden_state_highway_out = self.dropout(hidden_state_highway_out)
+        logits = self.hidden2tag(hidden_state_highway_out)
+        # logits = self.hidden2tag(hidden_state)
         return logits
 
     def get_span_candidates(self, text_len, max_sentence_length, max_mention_width):
