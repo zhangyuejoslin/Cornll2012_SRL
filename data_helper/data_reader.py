@@ -161,7 +161,7 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
   
     return (train_samples_np, train_mask_np, train_labels_np, train_predicate_np),\
             (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np),\
-            (test_samples_np, test_mask_np, test_labels_np, test_predicate_np), emb_np, token_vocab, label_vocab
+            (test_samples_np, test_mask_np, test_labels_np, test_predicate_np), emb_np, token_vocab, label_vocab, constraint_mat
 
 ### test data_preprocesing
 #### sample data

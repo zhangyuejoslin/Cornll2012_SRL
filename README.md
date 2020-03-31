@@ -52,6 +52,18 @@ After data reader, the data is like this format:
 4. first dev sample predicate position: 10
 ----------------------------------------------------
 
+## Model Description and Current Performance
+1. Bi-LSTM as baseline
+>-  We implement this baseline by a two-layer bidirectional LSTM with 100 hidden units. 
+>- We got 55.694% and 58.174% micro-averaged multiclass F1 score for develop and test dataset respectively.
+2. Bi-LSTM+Highway+Viterbi Model
+>- We implement this model with three different modules. 
+>- The first module is the bidirectional LSTM. To better compare the performance, we maintain the same hyper-parameters, which are the same as the baseline. 
+>- The second module is a highway connection module that can alleviate the vanishing gradient problem when training deep BiLSTMs. 
+>- The third module is the Viterbi algorithm. The approach described so far does not model any dependencies between the output tags. To incorporate constraints on the output structure at decoding time, we make use of the Viterbi algorithm for decoding. All the constraints are based on the original paper.
+>- Finally, we obtain 57.00% and 59.49% micro-averaged multiclass F1 score for dev and test dataset.
+
+
 
 
 
