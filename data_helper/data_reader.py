@@ -62,8 +62,10 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
     # label_set = list(set(train_label_set + dev_label_set))
     print('Reading dev data...')
     dev_pair, label_counter = read_raw_sentences(dev_file, counter=label_counter)
-
     test_pair, label_counter = read_raw_sentences(test_file, counter=label_counter)
+    dev_token  = [each_dev_pair[0] for each_dev_pair in dev_pair]
+    test_token  = [each_test_pair[0] for each_test_pair in test_pair]
+
     print(f'Loaded {len(dev_pair)} examples from {dev_file}')
     print('Loading glove vectors...')
     embed, token_vocab = load_embeddings(embed_file)
@@ -160,8 +162,8 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
 
   
     return (train_samples_np, train_mask_np, train_labels_np, train_predicate_np),\
-            (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np),\
-            (test_samples_np, test_mask_np, test_labels_np, test_predicate_np), emb_np, token_vocab, label_vocab, constraint_mat
+            (dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, dev_token),\
+            (test_samples_np, test_mask_np, test_labels_np, test_predicate_np, test_token), emb_np, token_vocab, label_vocab, constraint_mat
 
 ### test data_preprocesing
 #### sample data

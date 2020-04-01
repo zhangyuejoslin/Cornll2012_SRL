@@ -4,7 +4,8 @@ import torch
 from tqdm import tqdm
 from data_helper.data_reader import *
 from model.SRL_model import SRL_Model
-from model.Decoder import viterbi_decode
+from model.Decoder import viterbi_decode, ilp_decoder
+from data_helper.prediction_builder import save_predictions
 from config.global_config import CONFIG
 import os
 import random
@@ -43,12 +44,25 @@ def train(model, opt, new_train_sample, vocab_label, total_num_trian_sample):
         ls.append(loss.item())
     return ls
 
-def call_viterbi(logit, transition_matrix):
+def call_viterbi(logit, transition_matrix, label_dict):
+    new_label_dict = {value:key for key, value in label_dict.items()}
     viterbi_paths, viterbi_scores = viterbi_decode(logit.view(-1, logit.size()[-1]), transition_matrix, cfg.beam_search_top_k)
     predictions = viterbi_paths[0] ## choose top 1
-    return predictions
+    new_prediction = []
+    for each_lablel_index in predictions:
+        new_prediction.append(new_label_dict[each_lablel_index])
+    try:
+        return new_prediction, predictions.index(5)
+    except ValueError:
+        return new_prediction, 0
 
-def eval(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
+    # viterbi_paths, viterbi_scores = viterbi_decode(logit.view(-1, logit.size()[-1]), transition_matrix, cfg.beam_search_top_k)
+    # predictions = viterbi_paths[0] ## choose top 1
+    # return predictions
+
+
+
+def eval_with_micro_F1(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
     """
     model: A pytorch module
     samples: dataset samples (n * max_len)
@@ -59,6 +73,8 @@ def eval(model, samples, masks, labels, gold_predicate, label_vocab, transition_
     """
     all_preds = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
     all_labels = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    prediction_labels = []
+    predicts_list = []
     with torch.no_grad():
         # for i in tqdm(range(0, samples.shape[0], cfg.batch_size), total=(samples.shape[0]//cfg.batch_size), desc="Validation"):
         for i in tqdm(range(samples.shape[0]), total=(len(samples)), desc="Validation"):
@@ -103,8 +119,56 @@ def eval(model, samples, masks, labels, gold_predicate, label_vocab, transition_
             except:
                 pass
 
+
     
     return metrics.f1_score(y_true=all_labels.cpu(), y_pred=all_preds.cpu(), average='micro')
+
+def eval_with_viterbi(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
+    """
+    model: A pytorch module
+    samples: dataset samples (n * max_len)
+    masks: dataset mask (n * max_len)
+    gold_predicate: 0/1 gold predicate(n * max_len)
+    labels: dataset labels (n * max_len)
+    label_vocab: a torchtext vocab for labels
+    """
+    all_preds = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    all_labels = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    prediction_labels = []
+    predicts_list = []
+    with torch.no_grad():
+        # for i in tqdm(range(0, samples.shape[0], cfg.batch_size), total=(samples.shape[0]//cfg.batch_size), desc="Validation"):
+        for i in tqdm(range(samples.shape[0]), total=(len(samples)), desc="Validation"):
+        # for i in range(samples.shape[0]):
+            # tokens: 1 * length of sentence
+            # label_list: 1 * length
+
+            # tokens = torch.tensor(samples[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
+            # label_list = torch.tensor(labels[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
+            # cur_masks = torch.tensor(masks[i: i+cfg.batch_size,:][masks[i: i+cfg.batch_size]==1], dtype=torch.long).unsqueeze(0).cuda()
+            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(masks[i, :][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            cur_gold_predicate = torch.tensor(gold_predicate[i, :][masks[i]==1], dtype=torch.float32).unsqueeze(0).cuda(cfg.use_which_gpu)
+
+            tokens = torch.tensor(tokens, dtype=torch.long).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(cur_masks, dtype=torch.long).cuda(cfg.use_which_gpu)
+            cur_gold_predicate = torch.tensor(cur_gold_predicate, dtype=torch.float32).cuda(cfg.use_which_gpu)
+            # tokens: len * 1
+            tokens = torch.t(tokens)
+            #logit: length * 1 * labels
+            logit: torch.Tensor = model(tokens, cur_masks, cur_gold_predicate)
+
+            # argmax predictions
+            # predictions: length * 1
+            # _, predictions = logit.max(dim=2)
+            # _, predictions_drew = logit.max(dim=2)
+            predictions, predicates_index = call_viterbi(logit, transition_matrix, label_vocab.stoi)
+            prediction_labels.append(predictions)
+            predicts_list.append(predicates_index)
+            
+    return prediction_labels, predicts_list
+
 
 
 def find_list(indices, data):
@@ -152,6 +216,7 @@ if __name__ == '__main__':
                                                                cfg.test_loc,
                                                                cfg.glove_embedding_loc, 
                                                                cfg.max_len)
+   
 
     num_train_set = train_set[0].shape[0]
     # num_dev_set = dev_set[0].shape[0]
@@ -161,27 +226,35 @@ if __name__ == '__main__':
         os.makedirs(cfg.model_store_dir)
     model = SRL_Model(emb, labels, is_test=False).train().cuda(cfg.use_which_gpu)
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
-    dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np = dev_set
-    test_samples_np, test_mask_np, test_labels_np, test_predicate_np = test_set
+    dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, dev_token_list = dev_set
+    test_samples_np, test_mask_np, test_labels_np, test_predicate_np, test_token_list = test_set
     
     train_predicate_np = generate_gold_predicate_0_1_matrix(train_predicate_np)
     dev_predicate_np = generate_gold_predicate_0_1_matrix(dev_predicate_np)
     test_predicate_np = generate_gold_predicate_0_1_matrix(test_predicate_np)
 
     opt = torch.optim.Adam(model.parameters())
-    for epoch in range(cfg.epochs):
-        print(f'Starting epoch {epoch+1}') 
-        new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
-        ls = train(model, opt, new_train_sample, labels, num_train_set)
-        # Validation
-        # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
+    # for epoch in range(cfg.epochs):
+    #     print(f'Starting epoch {epoch+1}') 
+    #     new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
+    #     ls = train(model, opt, new_train_sample, labels, num_train_set)
+    #     # Validation
+    #     # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
 
-        # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
-        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
-    torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+    #     # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
+    #     print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
+    # torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+    
+
+    checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
+    model.load_state_dict(checkpoint['model'])
+    #f1_score = eval(model, test_samples_np, test_mask_np,test_labels_np, labels)
+    # print(f1_score)
 
     ### test
-    f1_score_val = eval(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
-    f1_score_test = eval(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_np, labels, transition_matrix)
-    print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
+   # f1_score_val = eval_with_micro_F1(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
+    predict_label_list, preidcts_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_np, labels, transition_matrix)
+    save_predictions(test_token_list, preidcts_list, predict_label_list, "prediction_for_chen_test.txt")
+    #print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
+    #print(f'Test F1: {f1_score_test}')
 
