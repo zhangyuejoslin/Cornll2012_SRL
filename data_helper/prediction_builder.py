@@ -35,7 +35,7 @@ def save_predictions(input_sentences, predicate_ids, predictions, output_file):
         if last_sentence != sentence:
             last_sentence = sentence
             new_q = []
-            for _ in range(len(words)):
+            for _ in range(len([word for word in words if word != '<pad>'])):
                 new_q.append(list(['-']))
             sentences.append(new_q)
 
@@ -43,10 +43,11 @@ def save_predictions(input_sentences, predicate_ids, predictions, output_file):
         sentences[-1][pred_id][0] = words[pred_id]
         # add current predicate spans
         for i, output_label in enumerate(labels_to_output(labels)):
-            sentences[-1][i].append(output_label)
+            if words[i] != '<pad>':
+                sentences[-1][i].append(output_label)
 
     with open(output_file, 'w') as output_file:
         output_file.write('\n\n'.join(['\n'.join([' '.join(line) for line in q]) for q in sentences]))
 
 
-save_predictions([['What','is', 'your', 'deal'],['What','is', 'your', 'deal'],['What', 'your', 'is', 'deal']], [1,2,3],[['B-ARG1','B-V','O','O'],['B-ARG1','B-V','O','O'],['B-ARG1','B-V','O','O']], 'output.txt')
+save_predictions([['What','is', 'your', 'deal', '<pad>']], [1],[['B-ARG1','B-V','O','O','O']], 'output.txt')
