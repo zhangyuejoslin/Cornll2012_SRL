@@ -42,12 +42,15 @@ def save_predictions(input_sentences, predicate_ids, predictions, output_file):
         # add current predicate
         sentences[-1][pred_id][0] = words[pred_id]
         # add current predicate spans
-        for i, output_label in enumerate(labels_to_output(labels)):
-            if words[i] != '<pad>':
-                sentences[-1][i].append(output_label)
+        output_labels = labels_to_output(labels)
+        for i, _ in enumerate(words):
+            if i < len(output_labels):
+                sentences[-1][i].append(output_labels[i])
+            else:
+                sentences[-1][i].append('*')
 
     with open(output_file, 'w') as output_file:
         output_file.write('\n\n'.join(['\n'.join([' '.join(line) for line in q]) for q in sentences]))
 
-
-save_predictions([['What','is', 'your', 'deal', '<pad>']], [1],[['B-ARG1','B-V','O','O','O']], 'output.txt')
+if __name__ == '__main__':
+    save_predictions([['What','is', 'your', 'deal', '?']], [1],[['B-ARG1','B-V','O']], 'output.txt')

@@ -231,30 +231,30 @@ if __name__ == '__main__':
     
     train_predicate_np = generate_gold_predicate_0_1_matrix(train_predicate_np)
     dev_predicate_np = generate_gold_predicate_0_1_matrix(dev_predicate_np)
-    test_predicate_np = generate_gold_predicate_0_1_matrix(test_predicate_np)
+    test_predicate_01_np = generate_gold_predicate_0_1_matrix(test_predicate_np)
 
     opt = torch.optim.Adam(model.parameters())
-    # for epoch in range(cfg.epochs):
-    #     print(f'Starting epoch {epoch+1}') 
-    #     new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
-    #     ls = train(model, opt, new_train_sample, labels, num_train_set)
-    #     # Validation
-    #     # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
+    for epoch in range(cfg.epochs):
+        print(f'Starting epoch {epoch+1}') 
+        new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
+        ls = train(model, opt, new_train_sample, labels, num_train_set)
+        # Validation
+        # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
 
-    #     # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
-    #     print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
-    # torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+        # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
+        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
+    torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
     
 
-    checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
-    model.load_state_dict(checkpoint['model'])
+    # checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
+    # model.load_state_dict(checkpoint['model'])
     #f1_score = eval(model, test_samples_np, test_mask_np,test_labels_np, labels)
     # print(f1_score)
 
     ### test
    # f1_score_val = eval_with_micro_F1(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
-    predict_label_list, preidcts_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_np, labels, transition_matrix)
-    save_predictions(test_token_list, preidcts_list, predict_label_list, "prediction_for_chen_test.txt")
+    predict_label_list, preidcts_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_01_np, labels, transition_matrix)
+    save_predictions(test_token_list, test_predicate_np, predict_label_list, "prediction_for_chen_test.txt")
     #print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
     #print(f'Test F1: {f1_score_test}')
 
