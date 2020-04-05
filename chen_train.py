@@ -9,6 +9,7 @@ from data_helper.prediction_builder import save_predictions
 from config.global_config import CONFIG
 import os
 import random
+import math
 
 #### load config
 cfg = CONFIG()
@@ -60,7 +61,35 @@ def call_viterbi(logit, transition_matrix, label_dict):
     # predictions = viterbi_paths[0] ## choose top 1
     # return predictions
 
+def eval_with_xentropy(model, samples, vocab_label):
+    with torch.no_grad():
+        ls = []
+        for example in samples:
+            # token: batch * length of sentence
+            # label_list: batch * length
+            token, mask, label_list, gold_predicate = example
+            # token: length * batch
+            token = zip(*token)
 
+            #logit: length * batch * dim
+            token = torch.tensor(tuple(token)).cuda(cfg.use_which_gpu)
+            mask = torch.tensor(tuple(mask)).cuda(cfg.use_which_gpu)
+            gold_predicate = torch.tensor(tuple(gold_predicate), dtype=torch.float32).cuda(cfg.use_which_gpu)
+            logit = model(token, mask, gold_predicate)
+            #label_vec: length * batch * label_length
+            label_vec = torch.zeros(token.shape[0], token.shape[1], len(vocab_label)).cuda(cfg.use_which_gpu)
+
+            for batch_num in range(token.shape[1]):
+                for each_label in range(len(label_list[batch_num])):
+                    label_num = label_list[batch_num][each_label]
+                    label_vec[each_label, batch_num, label_num] = 1
+                    # label_vec[batch_num, each_label, label_num] = 1
+                    
+
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(logit, label_vec).cuda(cfg.use_which_gpu)
+            ls.append(loss.item())
+
+        return mean(ls)
 
 def eval_with_micro_F1(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
     """
@@ -233,28 +262,32 @@ if __name__ == '__main__':
     dev_predicate_np = generate_gold_predicate_0_1_matrix(dev_predicate_np)
     test_predicate_01_np = generate_gold_predicate_0_1_matrix(test_predicate_np)
 
+
     opt = torch.optim.Adam(model.parameters())
+    best_loss = math.inf
     for epoch in range(cfg.epochs):
         print(f'Starting epoch {epoch+1}') 
         new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
         ls = train(model, opt, new_train_sample, labels, num_train_set)
         # Validation
+        validation_samples = generate_batch(dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, 32, shuffle=False)
+        validation_loss = eval_with_xentropy(model, validation_samples, labels)
         # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
 
         # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
         print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
-    torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+        if validation_loss < best_loss:
+            torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
     
 
-    # checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
-    # model.load_state_dict(checkpoint['model'])
-    #f1_score = eval(model, test_samples_np, test_mask_np,test_labels_np, labels)
-    # print(f1_score)
+    checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
+    model.load_state_dict(checkpoint['model'])
 
     ### test
-   # f1_score_val = eval_with_micro_F1(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
+    # f1_score_val = eval_with_micro_F1(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
+    print(f"Outputting test predictions with best weights to {cfg.predictions_file}")
     predict_label_list, preidcts_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_01_np, labels, transition_matrix)
-    save_predictions(test_token_list, test_predicate_np, predict_label_list, "prediction_for_chen_test.txt")
+    save_predictions(test_token_list, test_predicate_np, predict_label_list, cfg.predictions_file)
     #print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
     #print(f'Test F1: {f1_score_test}')
 

@@ -2,7 +2,7 @@ from collections import Counter
 import random
 import numpy as np
 import torch
-from torchtext.vocab import Vocab
+from torchtext.vocab import Vocab, Vectors
 '''
 sample example:
 5 We respectfully invite you to watch a special edition of Across China . ||| O O O B-ARG0 O B-V B-ARG1 I-ARG1 I-ARG1 I-ARG1 I-ARG1 I-ARG1 O
@@ -34,17 +34,18 @@ def read_raw_sentences(file_path, counter=None):
 
 ### use glove embedding
 def load_embeddings(file_path):
-    embeddings_res = []
     token_counter = Counter()
     f = open(file_path, 'r', encoding='UTF-8')
     for line in f:
         line = line.strip().split()
-        embeddings_res.append([float(emb) for emb in line[1:]])
         token_counter[line[0]] += 1
-    embeddings_res.insert(0, [random.gauss(0, 0.01) for _ in range(len(embeddings_res[0]))])
     f.close()
 
-    return embeddings_res, Vocab(token_counter)
+    token_vocab = Vocab(token_counter)
+    glove_vectors = Vectors(file_path)
+    token_vocab.load_vectors(glove_vectors)
+
+    return token_vocab.vectors, token_vocab
 
 ### test case for read_raw_sentences: pass
 # embeddings_res, word_to_id = load_embeddings('/home/hlr/shared/glove6B/glove.6B.50d.txt')
@@ -90,7 +91,6 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
     test_predicate = [sent[2] for sent in test_pair]
 
     # Build binary bigram transition matrix
-
     constraint_mat = torch.zeros((len(label_vocab), len(label_vocab)))
 
     def update_constraint_mat(labels, matrix):
@@ -189,8 +189,6 @@ def data_preprocesing(train_file, dev_file, test_file, embed_file, max_len):
 # print('vocab list length:', len(vocab))
 # print('label_list:', labels)
 
-
-    
 
 
 

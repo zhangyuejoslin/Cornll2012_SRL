@@ -22,9 +22,9 @@ class CONFIG(object):
         self.dropout = 0.1  # Dropout rate (1 - keep probability).
         self.weight_decay = 0.   # Weight for L2 loss on embedding matrix.
         self.early_stopping = 20 # Tolerance for early stopping (# of epochs).
-        self.batch_size = 512
+        self.batch_size = 80
         self.gpu_node = 1 # which gpu you want to use;
-        self.max_len = 20
+        self.max_len = 100
         self.beam_search_top_k = 5
         self.model_store_dir = 'checkpoint'
         self.model_store_file = '9.pt'
