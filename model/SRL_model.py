@@ -38,7 +38,12 @@ class SRL_Model(torch.nn.Module):
         self.hidden2tag = nn.Linear(cfg.lstm_hidden_dim*2, len(target_vocab))
 
         #dropout
-        self.dropout = nn.Dropout(cfg.dropout) 
+        self.dropout = nn.Dropout(cfg.dropout)
+
+        # Orthogonal init
+        for param in self.lstm.parameters():
+            if len(param.shape) > 2:
+                nn.init.orthogonal_(param)
     
     def forward(self, sentence, sen_mask, predicate_index):
         x = self.embeddings(sentence)
