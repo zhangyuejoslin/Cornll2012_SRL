@@ -91,6 +91,43 @@ def eval_with_xentropy(model, samples, vocab_label):
 
         return mean(ls)
 
+def eval_with_ILP(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
+    """
+    model: A pytorch module
+    samples: dataset samples (n * max_len)
+    masks: dataset mask (n * max_len)
+    gold_predicate: 0/1 gold predicate(n * max_len)
+    labels: dataset labels (n * max_len)
+    label_vocab: a torchtext vocab for labels
+    """
+    binary_matrix = torch.tensor([],dtype=torch.bool).cuda(cfg.use_which_gpu)
+    all_preds = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    all_labels = torch.tensor([],dtype=torch.long).cuda(cfg.use_which_gpu)
+    prediction_labels = []
+    predicts_list = []
+    with torch.no_grad():
+        for i in tqdm(range(samples.shape[0]), total=(len(samples)), desc="Validation"):
+            tokens = torch.tensor(samples[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            label_list = torch.tensor(labels[i,:][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(masks[i, :][masks[i]==1], dtype=torch.long).unsqueeze(0).cuda(cfg.use_which_gpu)
+            cur_gold_predicate = torch.tensor(gold_predicate[i, :][masks[i]==1], dtype=torch.float32).unsqueeze(0).cuda(cfg.use_which_gpu)
+
+            tokens = torch.tensor(tokens, dtype=torch.long).cuda(cfg.use_which_gpu)
+            cur_masks = torch.tensor(cur_masks, dtype=torch.long).cuda(cfg.use_which_gpu)
+            cur_gold_predicate = torch.tensor(cur_gold_predicate, dtype=torch.float32).cuda(cfg.use_which_gpu)
+            # tokens: len * 1
+            tokens = torch.t(tokens)
+
+            #logit: length * 1 * labels
+            logit: torch.Tensor = model(tokens, cur_masks, cur_gold_predicate)
+            logit = logit.view(logit.shape[0],logit.shape[2])
+
+            predictions, predicates_index = ilp_decoder(logit.cpu().numpy(), label_vocab)
+            prediction_labels.append(predictions)
+            predicts_list.append(predicates_index)
+    
+    return prediction_labels
+
 def eval_with_micro_F1(model, samples, masks, labels, gold_predicate, label_vocab, transition_matrix):
     """
     model: A pytorch module
@@ -196,7 +233,7 @@ def eval_with_viterbi(model, samples, masks, labels, gold_predicate, label_vocab
             prediction_labels.append(predictions)
             predicts_list.append(predicates_index)
             
-    return prediction_labels, predicts_list
+    return prediction_labels
 
 
 
@@ -265,19 +302,19 @@ if __name__ == '__main__':
 
     opt = torch.optim.Adam(model.parameters())
     best_loss = math.inf
-    for epoch in range(cfg.epochs):
-        print(f'Starting epoch {epoch+1}') 
-        new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
-        ls = train(model, opt, new_train_sample, labels, num_train_set)
-        # Validation
-        validation_samples = generate_batch(dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, 32, shuffle=False)
-        validation_loss = eval_with_xentropy(model, validation_samples, labels)
-        # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
+    # for epoch in range(cfg.epochs):
+    #     print(f'Starting epoch {epoch+1}') 
+    #     new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
+    #     ls = train(model, opt, new_train_sample, labels, num_train_set)
+    #     # Validation
+    #     validation_samples = generate_batch(dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, 32, shuffle=False)
+    #     validation_loss = eval_with_xentropy(model, validation_samples, labels)
+    #     # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
 
-        # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
-        print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
-        if validation_loss < best_loss:
-            torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+    #     # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
+    #     print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
+    #     if validation_loss < best_loss:
+    #         torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
     
 
     checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
@@ -286,8 +323,7 @@ if __name__ == '__main__':
     ### test
     # f1_score_val = eval_with_micro_F1(model.eval(), dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, labels, transition_matrix)
     print(f"Outputting test predictions with best weights to {cfg.predictions_file}")
-    predict_label_list, preidcts_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_01_np, labels, transition_matrix)
+    predict_label_list = eval_with_viterbi(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_01_np, labels, transition_matrix)
+    predict_label_list = eval_with_ILP(model.eval(), test_samples_np, test_mask_np, test_labels_np, test_predicate_01_np, labels, transition_matrix)
     save_predictions(test_token_list, test_predicate_np, predict_label_list, cfg.predictions_file)
-    #print(f'Val F1: {f1_score_val}, Test F1: {f1_score_test}')
-    #print(f'Test F1: {f1_score_test}')
 
