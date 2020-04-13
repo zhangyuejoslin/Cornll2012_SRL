@@ -11,6 +11,8 @@ import os
 import random
 import math
 
+import wandb
+
 #### load config
 cfg = CONFIG()
 
@@ -240,6 +242,7 @@ def generate_gold_predicate_0_1_matrix(gold_predicate):
 
 if __name__ == '__main__':
 
+    wandb.init()
     train_set, dev_set, test_set, emb, vocab, labels, transition_matrix = data_preprocesing(cfg.train_loc,
                                                                cfg.dev_loc,
                                                                cfg.test_loc,
@@ -254,6 +257,7 @@ if __name__ == '__main__':
     if not os.path.exists(cfg.model_store_dir):
         os.makedirs(cfg.model_store_dir)
     model = SRL_Model(emb, labels, is_test=False).train().cuda(cfg.use_which_gpu)
+    wandb.watch(model)
     train_samples_np, train_mask_np, train_labels_np, train_predicate_np = train_set
     dev_samples_np, dev_mask_np, dev_labels_np, dev_predicate_np, dev_token_list = dev_set
     test_samples_np, test_mask_np, test_labels_np, test_predicate_np, test_token_list = test_set
@@ -265,6 +269,7 @@ if __name__ == '__main__':
 
     opt = torch.optim.Adam(model.parameters())
     best_loss = math.inf
+    stop_counter = 0
     for epoch in range(cfg.epochs):
         print(f'Starting epoch {epoch+1}') 
         new_train_sample =  generate_batch(train_samples_np, train_mask_np, train_labels_np, train_predicate_np, cfg.batch_size, False)
@@ -274,10 +279,18 @@ if __name__ == '__main__':
         validation_loss = eval_with_xentropy(model, validation_samples, labels)
         # f1_score = eval(model, dev_samples_np, dev_mask_np, dev_labels_np, labels, transition_matrix)
 
+        wandb.log({'Train Loss': mean(ls), 'Val Loss': validation_loss})
         # print(f'Epoch {epoch+1} finished, validation F1: {f1_score}, avg loss: {mean(ls)}')
         print(f'Epoch {epoch+1} finished, avg loss: {mean(ls)}')
         if validation_loss < best_loss:
             torch.save({'model': model.state_dict()}, cfg.model_store_dir + '/' + cfg.model_store_file)
+            stop_counter = 0
+        else:
+            stop_counter = stop_counter + 1
+
+        if stop_counter >= cfg.early_stopping:
+            print(f'Performance hasn\'t improved for {stop_counter} epochs, stopping')
+            break
     
 
     checkpoint = torch.load(cfg.model_store_dir + '/' + cfg.model_store_file)
